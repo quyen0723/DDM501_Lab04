@@ -1,0 +1,50 @@
+============================================================
+Load Test for Movie Rating API  (Lab 4 — Monitoring & Production)
+============================================================
+Command : python scripts/load_test.py --duration 120 --workers 20
+Mode    : Single (20 worker threads, 120s)
+Date    : 2026-08-09
+============================================================
+
+Progress (every 10s):
+  10s -  1520 requests (151.7 req/s, 1520 ok)
+  20s -  3020 requests (150.4 req/s, 3020 ok)
+  30s -  4560 requests (151.4 req/s, 4560 ok)
+  40s -  6080 requests (151.7 req/s, 6080 ok)
+  50s -  7600 requests (152.0 req/s, 7600 ok)
+  60s -  9140 requests (152.1 req/s, 9140 ok)
+  70s - 10660 requests (152.2 req/s, 10660 ok)
+  80s - 12180 requests (152.2 req/s, 12180 ok)
+  90s - 13720 requests (152.3 req/s, 13720 ok)
+ 100s - 15240 requests (152.4 req/s, 15240 ok)
+ 110s - 16780 requests (152.4 req/s, 16780 ok)
+ 120s - 18300 requests (152.5 req/s, 18300 ok)
+
+============================================================
+Load Test Results
+============================================================
+Total Requests:    18300
+Successful:        18300
+Failed:            0
+Success Rate:      100.00%
+Requests/Second:   152.50
+
+Latency Statistics (ms):
+  Min:     3.16
+  Max:    66.54
+  Mean:   17.60
+  Median: 17.49
+  StdDev:  6.17
+  P50:    17.49
+  P95:    25.51
+  P99:    42.49
+============================================================
+
+Verification (Prometheus queries after load test):
+  sum(ml_predictions_total)               = 20871   (2570 prior + 18300 this run)
+  ml_model_loaded                          = 1       (model healthy)
+  histogram_quantile(0.95, ml_prediction_duration_seconds) ~= 0.95 ms (model latency)
+  sum(increase(ml_prediction_value_bucket[5m])) by (le)  -> buckets span 1.0..5.0 (drift signal present)
+  5xx error rate                          = 0       (no 5xx)
+  active firing alerts                    = 0       (healthy)
+  prometheus targets                       = 3 UP (movie-rating-api, node, prometheus)

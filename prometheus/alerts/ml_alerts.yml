@@ -1,0 +1,114 @@
+# =============================================================================
+# ML-Specific Alerting Rules
+# DDM501 - Lab 4: Monitoring & Production Deployment
+#
+# These alerts focus on machine learning specific concerns:
+# - Model health
+# - Prediction performance
+# - Data drift indicators
+# =============================================================================
+
+groups:
+  - name: ml_alerts
+    rules:
+      # ========================================================================
+      # TODO 1: Model Not Loaded Alert
+      # ========================================================================
+      - alert: ModelNotLoaded
+        expr: ml_model_loaded == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ML Model not loaded"
+          description: "The ML model is not loaded on the API server"
+
+      # ========================================================================
+      # TODO 2: Prediction Latency High Alert
+      # Trigger when P95 prediction latency exceeds 100ms
+      # ========================================================================
+      - alert: PredictionLatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(ml_prediction_duration_seconds_bucket[5m])) by (le)
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ML prediction latency is high"
+          description: "P95 prediction latency is {{ $value }}s (threshold: 0.1s)"
+
+      # ========================================================================
+      # TODO 3: Low Prediction Volume Alert
+      # ========================================================================
+      - alert: LowPredictionVolume
+        expr: sum(rate(ml_predictions_total[5m])) < 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low prediction volume"
+          description: "Prediction rate is {{ $value }}/s, unusually low"
+
+      # ========================================================================
+      # TODO 4: Prediction Distribution Anomaly Alert
+      # Simple drift detection: median prediction shifted vs 24h ago
+      # ========================================================================
+      - alert: PredictionDistributionAnomaly
+        expr: |
+          abs(
+            histogram_quantile(0.5, sum(rate(ml_prediction_value_bucket[1h])) by (le)) -
+            histogram_quantile(0.5, sum(rate(ml_prediction_value_bucket[1h] offset 24h)) by (le))
+          ) > 0.5
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prediction distribution shift detected"
+          description: "Median prediction has shifted by more than 0.5 in 24h"
+
+      # ========================================================================
+      # TODO 5: High Prediction Error Rate Alert
+      # ========================================================================
+      - alert: HighPredictionErrorRate
+        expr: |
+          sum(rate(ml_prediction_errors_total[5m]))
+          / sum(rate(ml_predictions_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High prediction error rate"
+          description: "{{ $value | humanizePercentage }} of predictions are failing"
+
+      # ========================================================================
+      # TODO 6: Model Stale Alert (BONUS)
+      # Model hasn't been reloaded in 7 days (604800 seconds)
+      # ========================================================================
+      - alert: ModelStale
+        expr: time() - ml_model_last_reload_timestamp > 604800
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "ML model may be stale"
+          description: "Model hasn't been reloaded in over 7 days"
+
+      # ========================================================================
+      # TODO 7: Extreme Predictions Alert (BONUS)
+      # More than 30% of predictions at extreme values (<=1.5 or >4.5)
+      # ========================================================================
+      - alert: ExtremePredictionsHigh
+        expr: |
+          (
+            sum(rate(ml_prediction_value_bucket{le="1.5"}[1h]))
+            + sum(rate(ml_prediction_value_count[1h]))
+            - sum(rate(ml_prediction_value_bucket{le="4.5"}[1h]))
+          ) / sum(rate(ml_prediction_value_count[1h])) > 0.3
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many extreme predictions"
+          description: "More than 30% of predictions are at extreme values (<=1.5 or >4.5)"
